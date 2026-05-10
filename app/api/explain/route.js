@@ -1,0 +1,119 @@
+export const runtime = 'nodejs';
+
+const SYSTEM_PROMPT = `You are a tenant rights expert who helps renters understand lease agreements. When given a lease clause, you analyze it and respond with ONLY a valid JSON object — no markdown, no explanation outside the JSON.
+
+The JSON must have exactly these five fields:
+- "clauseType": The type of lease clause. Choose the single most appropriate label from: "Security Deposit", "Pet Policy", "Maintenance & Repairs", "Early Termination", "Liability & Indemnification", "Late Fees", "Subletting", "Utilities", "Entry & Inspection", "Noise & Nuisance", "Lease Renewal", "Other".
+- "plainEnglish": A 2-4 sentence explanation of what the clause means in plain, accessible language written directly to the renter. Start with "This clause...". If a state was provided, note any relevant state-specific laws or tenant protections that apply.
+- "redFlagScore": An integer from 1 to 10 rating how landlord-favored or risky the clause is. 1 = completely fair and standard, 10 = extremely one-sided or potentially illegal.
+- "redFlags": An array of strings, each describing a specific concern. Empty array [] if none. Each string should be one concise sentence starting with an action verb, e.g. "Requires you to...", "Allows the landlord to...", "Waives your right to...".
+- "fairRewrite": A rewritten version of the clause that is balanced and fair to both parties. Use neutral legal language but keep it readable.
+
+Respond with ONLY the JSON object. Do not wrap it in markdown code blocks.`;
+
+export async function POST(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const clause = body?.clause?.trim() ?? "";
+  if (!clause) {
+    return Response.json({ error: "A lease clause is required." }, { status: 400 });
+  }
+  if (clause.length > 6000) {
+    return Response.json({ error: "Clause is too long. Please limit to 6,000 characters." }, { status: 400 });
+  }
+
+  const state = typeof body?.state === "string" ? body.state.trim() : "";
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return Response.json({ error: "API key not configured on the server." }, { status: 500 });
+  }
+
+  const userMessage = state
+    ? `Analyze this lease clause for a tenant in ${state}:\n\n${clause}`
+    : `Analyze this lease clause:\n\n${clause}`;
+
+  let anthropicRes;
+  try {
+    anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "prompt-caching-2024-07-31",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1024,
+        system: [
+          {
+            type: "text",
+            text: SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        messages: [
+          {
+            role: "user",
+            content: userMessage,
+          },
+        ],
+      }),
+    });
+  } catch {
+    return Response.json({ error: "Failed to reach the AI service." }, { status: 502 });
+  }
+
+  if (!anthropicRes.ok) {
+    const errText = await anthropicRes.text().catch(() => "");
+    console.error("Anthropic API error", anthropicRes.status, errText);
+    return Response.json(
+      { error: "The AI service returned an error. Please try again." },
+      { status: 502 }
+    );
+  }
+
+  const data = await anthropicRes.json();
+  const raw = data?.content?.[0]?.text ?? "";
+
+  let parsed;
+  try {
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    parsed = JSON.parse(cleaned);
+  } catch {
+    console.error("Failed to parse Claude response as JSON:", raw);
+    return Response.json(
+      { error: "The AI returned an unreadable response. Please try again." },
+      { status: 500 }
+    );
+  }
+
+  const { clauseType, plainEnglish, redFlagScore, redFlags, fairRewrite } = parsed;
+
+  if (
+    typeof clauseType !== "string" ||
+    typeof plainEnglish !== "string" ||
+    typeof redFlagScore !== "number" ||
+    !Array.isArray(redFlags) ||
+    typeof fairRewrite !== "string"
+  ) {
+    return Response.json(
+      { error: "The AI returned an unexpected response format. Please try again." },
+      { status: 500 }
+    );
+  }
+
+  return Response.json({
+    clauseType,
+    plainEnglish,
+    redFlagScore: Math.min(10, Math.max(1, Math.round(redFlagScore))),
+    redFlags,
+    fairRewrite,
+  });
+}
