@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { usePostHog } from "posthog-js/react";
+import { RetroBadge } from "./RetroBadge";
+import { RetroButton } from "./RetroButton";
+import { RetroCard } from "./RetroCard";
 
 const MAX_CHARS = 6000;
 const WARN_THRESHOLD = 200;
@@ -32,7 +36,10 @@ const US_STATES = [
   "Washington", "West Virginia", "Wisconsin", "Wyoming",
 ];
 
-function CopyButton({ text }) {
+const RISK_BORDER = { High: "var(--retro-red)", Medium: "var(--retro-gold)", Low: "var(--retro-green)" };
+const RISK_LEVEL  = { High: "high", Medium: "medium", Low: "low" };
+
+function CopyButton({ text, onCopy }) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -40,8 +47,9 @@ function CopyButton({ text }) {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      onCopy?.();
     } catch {
-      // clipboard API unavailable (e.g. non-HTTPS in dev)
+      // clipboard API unavailable
     }
   }
 
@@ -49,111 +57,157 @@ function CopyButton({ text }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+      style={{
+        fontFamily:    "var(--font-oswald), Impact, sans-serif",
+        fontSize:      "0.65rem",
+        fontWeight:    "700",
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        padding:       "0.2rem 0.55rem",
+        background:    copied ? "var(--retro-green)" : "var(--retro-cream)",
+        color:         copied ? "var(--retro-cream)" : "var(--retro-navy)",
+        border:        `1.5px solid ${copied ? "var(--retro-green)" : "var(--retro-navy)"}`,
+        borderRadius:  "2px",
+        cursor:        "pointer",
+        transition:    "background 0.15s, color 0.15s",
+        flexShrink:    0,
+      }}
     >
-      {copied ? (
-        <>
-          <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-          Copied!
-        </>
-      ) : (
-        <>
-          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-          </svg>
-          Copy
-        </>
-      )}
+      {copied ? "Copied!" : "Copy"}
     </button>
   );
 }
 
-function ClauseTypeBadge({ type }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
-      <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-      </svg>
-      {type}
-    </span>
-  );
-}
-
-const SCORE_TIERS = {
-  low:  { badge: "bg-emerald-100 text-emerald-700", bar: "bg-emerald-500", label: "text-emerald-600", text: "Low Risk" },
-  mid:  { badge: "bg-amber-100  text-amber-700",   bar: "bg-amber-500",   label: "text-amber-600",  text: "Moderate Risk" },
-  high: { badge: "bg-red-100    text-red-700",      bar: "bg-red-500",     label: "text-red-600",    text: "High Risk" },
-};
-
 function ScoreBadge({ score }) {
-  const tier = score <= 3 ? SCORE_TIERS.low : score <= 6 ? SCORE_TIERS.mid : SCORE_TIERS.high;
+  const level  = score <= 3 ? "low" : score <= 6 ? "medium" : "high";
+  const colors = { low: "var(--retro-green)", medium: "var(--retro-gold)", high: "var(--retro-red)" };
+  const labels = { low: "Low Risk", medium: "Moderate Risk", high: "High Risk" };
 
   return (
-    <div className="flex items-center gap-3">
-      <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-bold ${tier.badge}`}>
-        {score}/10
-      </span>
-      <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
-        <div
-          className={`h-2 rounded-full ${tier.bar} transition-all duration-500`}
-          style={{ width: `${score * 10}%` }}
-        />
+    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+      <RetroBadge level={level}>{score}/10</RetroBadge>
+      <div style={{ flex: 1, height: "6px", background: "rgba(0,40,104,0.12)", borderRadius: "1px", overflow: "hidden", border: "1px solid rgba(0,40,104,0.2)" }}>
+        <div style={{ height: "100%", width: `${score * 10}%`, background: colors[level], transition: "width 0.5s ease" }} />
       </div>
-      <span className={`text-sm font-medium ${tier.label}`}>
-        {tier.text}
+      <span style={{ fontFamily: "var(--font-oswald), Impact, sans-serif", fontSize: "0.78rem", fontWeight: "700", textTransform: "uppercase", color: colors[level] }}>
+        {labels[level]}
       </span>
     </div>
   );
 }
 
-function ResultCard({ result, onAnalyzeAnother }) {
+function ClauseCard({ clause }) {
+  const level  = RISK_LEVEL[clause.risk] ?? "low";
+  const border = RISK_BORDER[clause.risk] ?? "var(--retro-green)";
+
   return (
-    <div className="mt-6 flex flex-col gap-5 border-t border-slate-100 pt-6">
-      {/* Clause type badge */}
+    <div style={{
+      background:   "var(--retro-cream)",
+      border:       "2px solid var(--retro-navy)",
+      borderTop:    `6px solid ${border}`,
+      borderRadius: "2px",
+      padding:      "1rem 1.1rem",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+        <RetroBadge level={level}>{clause.risk} Risk</RetroBadge>
+        <h4 style={{
+          fontFamily:    "var(--font-oswald), Impact, sans-serif",
+          fontSize:      "0.88rem",
+          fontWeight:    "700",
+          textTransform: "uppercase",
+          letterSpacing: "0.03em",
+          color:         "var(--retro-navy)",
+          margin:        0,
+        }}>
+          {clause.title}
+        </h4>
+      </div>
+      <p style={{ fontFamily: "Georgia, serif", fontSize: "0.875rem", color: "var(--retro-ink)", lineHeight: "1.65", margin: 0 }}>
+        {clause.explanation}
+      </p>
+      {clause.whyRisky && (
+        <p style={{ fontFamily: "Georgia, serif", fontSize: "0.8rem", color: "var(--retro-ink)", opacity: 0.75, lineHeight: "1.6", marginTop: "0.4rem", marginBottom: 0 }}>
+          <span style={{ fontWeight: "700" }}>Why it matters: </span>{clause.whyRisky}
+        </p>
+      )}
+      {clause.suggestedAction && (
+        <p style={{ fontFamily: "var(--font-oswald), Impact, sans-serif", fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--retro-gold)", marginTop: "0.5rem", marginBottom: 0 }}>
+          → {clause.suggestedAction}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ResultCard({ result, clause, onAnalyzeAnother }) {
+  const posthog = usePostHog();
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  async function handleDownloadPDF() {
+    setPdfLoading(true);
+    posthog?.capture("report_downloaded", {
+      clause_type: result.clauseType,
+      risk_score:  result.redFlagScore,
+    });
+    try {
+      const { generatePDF } = await import("../utils/generatePDF");
+      await generatePDF(result, clause);
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: "1.5rem", borderTop: "2px solid var(--retro-navy)", paddingTop: "1.5rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+
+      {/* Clause type */}
       <div>
-        <ClauseTypeBadge type={result.clauseType} />
+        <span className="retro-stamp" style={{ fontSize: "0.7rem" }}>
+          {result.clauseType}
+        </span>
       </div>
 
       {/* Plain English */}
       <section>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.966 8.966 0 00-6 2.292m0-14.25v14.25" />
-            </svg>
-            Plain English
-          </h3>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.6rem" }}>
+          <h3 className="retro-section-heading">Plain English</h3>
           <CopyButton text={result.plainEnglish} />
         </div>
-        <p className="text-slate-700 leading-relaxed">{result.plainEnglish}</p>
+        <div style={{ borderLeft: "6px solid var(--retro-gold)", padding: "0.75rem 1rem", background: "rgba(200,169,81,0.06)" }}>
+          <p style={{ fontFamily: "Georgia, Cambria, serif", fontSize: "0.95rem", lineHeight: "1.75", color: "var(--retro-ink)", margin: 0 }}>
+            {result.plainEnglish}
+          </p>
+        </div>
       </section>
 
       {/* Risk Score */}
       <section>
-        <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-          </svg>
-          Risk Score
-        </h3>
+        <h3 className="retro-section-heading" style={{ marginBottom: "0.75rem" }}>Risk Score</h3>
         <ScoreBadge score={result.redFlagScore} />
       </section>
+
+      {/* Clause Breakdown */}
+      {result.clauses?.length > 0 && (
+        <section>
+          <h3 className="retro-section-heading" style={{ marginBottom: "0.75rem" }}>Clause Breakdown</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+            {["High", "Medium", "Low"].flatMap((tier) =>
+              result.clauses
+                .filter((c) => c.risk === tier)
+                .map((c) => <ClauseCard key={c.title} clause={c} />)
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Red Flags */}
       {result.redFlags.length > 0 && (
         <section>
-          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
-            <svg className="h-4 w-4 text-red-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l1.664 1.664M21 21l-1.5-1.5m-5.485-1.242L12 17.25 4.5 21V8.742m.164-4.078a2.15 2.15 0 011.743-1.342 48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185V19.5M4.664 4.664L19.5 19.5" />
-            </svg>
-            Red Flags
-          </h3>
-          <ul className="flex flex-col gap-2">
+          <h3 className="retro-section-heading" style={{ marginBottom: "0.75rem" }}>Red Flags</h3>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             {result.redFlags.map((flag, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xs font-bold">!</span>
+              <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontFamily: "Georgia, serif", fontSize: "0.9rem", color: "var(--retro-ink)", lineHeight: "1.65" }}>
+                <span className="retro-stamp retro-stamp-red" style={{ fontSize: "0.6rem", padding: "0.1rem 0.4rem", marginTop: "0.15rem", flexShrink: 0 }}>!</span>
                 {flag}
               </li>
             ))}
@@ -163,42 +217,54 @@ function ResultCard({ result, onAnalyzeAnother }) {
 
       {/* Fair Rewrite */}
       <section>
-        <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-          <svg className="h-4 w-4 text-emerald-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-          </svg>
-          Fairer Rewrite
-        </h3>
-        <blockquote className="rounded-xl border-l-4 border-emerald-400 bg-emerald-50 px-5 py-4 text-sm text-slate-700 leading-relaxed italic">
-          {result.fairRewrite}
-        </blockquote>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.6rem" }}>
+          <h3 className="retro-section-heading">Fairer Rewrite</h3>
+          <CopyButton text={result.fairRewrite} onCopy={() => posthog?.capture("rewrite_requested")} />
+        </div>
+        <div style={{ borderLeft: "6px solid var(--retro-green)", paddingLeft: "0.9rem" }}>
+          <span className="retro-stamp" style={{ background: "var(--retro-green)", fontSize: "0.62rem", marginBottom: "0.5rem", display: "inline-block" }}>
+            Fairer Version
+          </span>
+          <p style={{ fontFamily: "Georgia, Cambria, serif", fontSize: "0.92rem", lineHeight: "1.75", fontStyle: "italic", color: "var(--retro-ink)", margin: 0 }}>
+            {result.fairRewrite}
+          </p>
+        </div>
       </section>
 
-      {/* Analyze another */}
-      <div>
-        <button
-          type="button"
-          onClick={onAnalyzeAnother}
-          className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-6 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-          </svg>
+      {/* Actions */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
+        <div>
+          <RetroButton
+            variant="gold"
+            onClick={handleDownloadPDF}
+            disabled={pdfLoading}
+            style={{ opacity: pdfLoading ? 0.55 : 1, cursor: pdfLoading ? "not-allowed" : "pointer" }}
+          >
+            {pdfLoading ? "Generating…" : "Download PDF Report"}
+          </RetroButton>
+          {!pdfLoading && (
+            <p style={{ fontFamily: "Georgia, serif", fontSize: "0.75rem", color: "var(--retro-ink)", opacity: 0.55, marginTop: "0.35rem", margin: "0.35rem 0 0" }}>
+              Full risk report with explanation and rewrite
+            </p>
+          )}
+        </div>
+        <RetroButton variant="ghost" onClick={onAnalyzeAnother}>
           Analyze Another Clause
-        </button>
+        </RetroButton>
       </div>
     </div>
   );
 }
 
 export default function LeaseForm() {
+  const posthog = usePostHog();
   const [clause, setClause] = useState("");
   const [state, setState] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const formTopRef = useRef(null);
-  const resultRef = useRef(null);
+  const resultRef  = useRef(null);
 
   useEffect(() => {
     if (result) {
@@ -206,13 +272,14 @@ export default function LeaseForm() {
     }
   }, [result]);
 
-  const remaining = MAX_CHARS - clause.length;
+  const remaining   = MAX_CHARS - clause.length;
   const isNearLimit = remaining < WARN_THRESHOLD;
 
-  function loadSample(text) {
+  function loadSample(text, label) {
     setClause(text);
     setResult(null);
     setError(null);
+    posthog?.capture("sample_clause_loaded", { sample_label: label });
   }
 
   function handleAnalyzeAnother() {
@@ -230,42 +297,75 @@ export default function LeaseForm() {
     setResult(null);
     setError(null);
 
-    try {
-      const res = await fetch("/api/explain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clause, ...(state && { state }) }),
-      });
+    posthog?.capture("clause_analysis_submitted", {
+      clause_length:  clause.trim().length,
+      state_selected: state || null,
+    });
 
+    try {
+      const res  = await fetch("/api/explain", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ clause, ...(state && { state }) }),
+      });
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Something went wrong. Please try again.");
+        const errorMsg = data.error ?? "Something went wrong. Please try again.";
+        setError(errorMsg);
+        posthog?.capture("clause_analysis_failed", {
+          error:          errorMsg,
+          status_code:    res.status,
+          state_selected: state || null,
+        });
       } else {
         setResult(data);
+        posthog?.capture("clause_analysis_completed", {
+          clause_type:    data.clauseType,
+          risk_score:     data.redFlagScore,
+          red_flags_count:data.redFlags?.length ?? 0,
+          clauses_count:  data.clauses?.length ?? 0,
+          state_selected: state || null,
+        });
       }
-    } catch {
-      setError("Network error. Check your connection and try again.");
+    } catch (err) {
+      const errorMsg = "Network error. Check your connection and try again.";
+      setError(errorMsg);
+      posthog?.captureException(err);
+      posthog?.capture("clause_analysis_failed", {
+        error:          errorMsg,
+        state_selected: state || null,
+      });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div ref={formTopRef} className="w-full">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <div ref={formTopRef} style={{ width: "100%" }}>
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+
         {/* Sample clause buttons */}
-        <div className="flex flex-wrap gap-2">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
           {SAMPLE_CLAUSES.map((s) => (
             <button
               key={s.label}
               type="button"
-              onClick={() => loadSample(s.text)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+              onClick={() => loadSample(s.text, s.label)}
+              style={{
+                fontFamily:    "var(--font-oswald), Impact, sans-serif",
+                fontSize:      "0.68rem",
+                fontWeight:    "700",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                padding:       "0.28rem 0.65rem",
+                background:    "var(--retro-cream)",
+                color:         "var(--retro-navy)",
+                border:        "1.5px solid var(--retro-navy)",
+                borderRadius:  "2px",
+                cursor:        "pointer",
+              }}
             >
-              <svg className="h-3 w-3 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
               {s.label}
             </button>
           ))}
@@ -276,33 +376,62 @@ export default function LeaseForm() {
           value={clause}
           onChange={(e) => {
             setClause(e.target.value);
-            if (result || error) {
-              setResult(null);
-              setError(null);
-            }
+            if (result || error) { setResult(null); setError(null); }
           }}
           placeholder='Paste a lease clause here, e.g. "Tenant shall indemnify and hold harmless Landlord from any and all claims..."'
           rows={7}
           maxLength={MAX_CHARS}
-          className="w-full rounded-xl border border-slate-200 bg-white px-5 py-4 text-slate-800 placeholder:text-slate-400 text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent resize-none transition"
+          style={{
+            width:        "100%",
+            boxSizing:    "border-box",
+            background:   "#FFFEF5",
+            border:       "2px solid var(--retro-navy)",
+            borderRadius: "2px",
+            padding:      "0.75rem 1rem",
+            fontFamily:   "Georgia, Cambria, serif",
+            fontSize:     "0.95rem",
+            lineHeight:   "1.7",
+            color:        "var(--retro-ink)",
+            resize:       "vertical",
+            outline:      "none",
+          }}
+          onFocus={(e) => { e.target.style.borderColor = "var(--retro-gold)"; }}
+          onBlur={(e)  => { e.target.style.borderColor = "var(--retro-navy)"; }}
         />
 
         {/* Character counter */}
-        <div className="flex justify-end -mt-2">
-          {clause.length > 0 && (
-            <span className={`text-xs font-medium tabular-nums ${isNearLimit ? "text-red-500" : "text-slate-400"}`}>
+        {clause.length > 0 && (
+          <div style={{ textAlign: "right", marginTop: "-0.5rem" }}>
+            <span style={{
+              fontFamily: "Georgia, serif",
+              fontSize:   "0.75rem",
+              color:      isNearLimit ? "var(--retro-red)" : "var(--retro-ink)",
+              opacity:    isNearLimit ? 1 : 0.5,
+            }}>
               {remaining.toLocaleString()} character{remaining === 1 ? "" : "s"} remaining
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* State selector + Submit */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="relative flex-1">
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+          <div style={{ position: "relative" }}>
             <select
               value={state}
               onChange={(e) => setState(e.target.value)}
-              className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
+              style={{
+                width:        "100%",
+                appearance:   "none",
+                background:   "var(--retro-cream)",
+                border:       "2px solid var(--retro-navy)",
+                borderRadius: "2px",
+                padding:      "0.6rem 2.5rem 0.6rem 0.9rem",
+                fontFamily:   "Georgia, Cambria, serif",
+                fontSize:     "0.88rem",
+                color:        "var(--retro-ink)",
+                outline:      "none",
+                cursor:       "pointer",
+              }}
             >
               <option value="">All states (select yours for local context)</option>
               {US_STATES.map((s) => (
@@ -310,55 +439,52 @@ export default function LeaseForm() {
               ))}
             </select>
             <svg
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"
+              style={{ position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)", width: "1rem", height: "1rem", color: "var(--retro-navy)", pointerEvents: "none" }}
               fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
             </svg>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading || !clause.trim()}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-8 py-3 text-white font-semibold text-base shadow-md hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                Analyzing&hellip;
-              </>
-            ) : (
-              "Explain This Clause"
-            )}
-          </button>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <RetroButton
+              type="submit"
+              variant="primary"
+              disabled={loading || !clause.trim()}
+              style={{ opacity: (loading || !clause.trim()) ? 0.5 : 1, cursor: (loading || !clause.trim()) ? "not-allowed" : "pointer" }}
+            >
+              {loading ? "Analyzing…" : "Explain This Clause"}
+            </RetroButton>
+          </div>
         </div>
       </form>
 
+      {/* Loading state */}
       {loading && (
-        <div className="mt-6 flex flex-col items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50 py-10">
-          <svg className="animate-spin h-7 w-7 text-indigo-500" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-          </svg>
-          <p className="text-sm font-medium text-indigo-600">Analyzing your clause&hellip;</p>
+        <div style={{ marginTop: "1.5rem", textAlign: "center", padding: "2.5rem 1.5rem", border: "2px solid var(--retro-navy)", borderRadius: "2px", background: "rgba(0,40,104,0.04)" }}>
+          <span className="retro-stamp retro-pulse" style={{ fontSize: "0.8rem", marginBottom: "0.75rem", display: "inline-block" }}>
+            Analyzing…
+          </span>
+          <p style={{ fontFamily: "Georgia, serif", color: "var(--retro-ink)", opacity: 0.6, margin: 0, fontSize: "0.9rem" }}>
+            Reading your lease clause…
+          </p>
         </div>
       )}
 
+      {/* Error state */}
       {error && (
-        <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 flex items-start gap-3">
-          <svg className="h-5 w-5 flex-shrink-0 mt-0.5 text-red-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-          </svg>
-          {error}
+        <div style={{ marginTop: "1.5rem", border: "2.5px solid var(--retro-red)", borderLeft: "6px solid var(--retro-red)", borderRadius: "2px", padding: "0.9rem 1.1rem", display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
+          <span className="retro-stamp retro-stamp-red" style={{ fontSize: "0.6rem", padding: "0.1rem 0.4rem", marginTop: "0.1rem", flexShrink: 0 }}>!</span>
+          <p style={{ fontFamily: "Georgia, serif", fontSize: "0.9rem", color: "var(--retro-red)", lineHeight: "1.6", margin: 0 }}>
+            {error}
+          </p>
         </div>
       )}
 
+      {/* Result */}
       {result && (
         <div ref={resultRef}>
-          <ResultCard result={result} onAnalyzeAnother={handleAnalyzeAnother} />
+          <ResultCard result={result} clause={clause} onAnalyzeAnother={handleAnalyzeAnother} />
         </div>
       )}
     </div>

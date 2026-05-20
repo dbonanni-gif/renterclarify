@@ -3,6 +3,14 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --retro-navy:   #002868;
+  --retro-red:    #CC2200;
+  --retro-cream:  #FDF6E3;
+  --retro-gold:   #C8A951;
+  --retro-green:  #3A5F3A;
+  --retro-ink:    #1A1A1A;
+  --retro-border: 2.5px solid #002868;
+  --retro-shadow: 4px 4px 0px #002868;
 }
 
 @theme inline {
@@ -10,6 +18,20 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-retro-navy:  #002868;
+  --color-retro-red:   #CC2200;
+  --color-retro-cream: #FDF6E3;
+  --color-retro-gold:  #C8A951;
+  --color-retro-green: #3A5F3A;
+  --color-retro-ink:   #1A1A1A;
+
+  --font-display: var(--font-oswald), 'Impact', 'Franklin Gothic Medium', sans-serif;
+  --font-body:    'Georgia', 'Cambria', serif;
+
+  --shadow-retro:     4px 4px 0px #002868;
+  --shadow-retro-red: 4px 4px 0px #CC2200;
+  --shadow-retro-sm:  2px 2px 0px #002868;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,4 +45,148 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+main {
+  background: var(--retro-navy);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-oswald), 'Impact', 'Franklin Gothic Medium', sans-serif;
+}
+
+.retro-stamp {
+  display: inline-block;
+  background: var(--retro-navy);
+  color: var(--retro-cream);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.75rem;
+  border-radius: 2px;
+  font-size: 0.75rem;
+}
+
+.retro-stamp-red {
+  background: var(--retro-red);
+  color: var(--retro-cream);
+}
+
+.retro-stamp-gold {
+  background: var(--retro-gold);
+  color: var(--retro-ink);
+}
+
+.retro-card {
+  background: var(--retro-cream);
+  border: 2.5px solid var(--retro-navy);
+  box-shadow: var(--retro-shadow);
+  border-radius: 2px;
+}
+
+.retro-section-heading {
+  font-family: 'Oswald', 'Impact', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--retro-navy);
+  border-bottom: 3px solid var(--retro-gold);
+  padding-bottom: 0.25rem;
+  display: inline-block;
+}
+
+@media (max-width: 640px) {
+  .retro-card {
+    box-shadow: 2px 2px 0px var(--retro-navy);
+  }
+}
+
+/* Navbar */
+.retro-nav-link {
+  font-family:     var(--font-oswald), Impact, sans-serif;
+  font-weight:     600;
+  font-size:       0.9rem;
+  letter-spacing:  0.08em;
+  text-transform:  uppercase;
+  color:           var(--retro-navy);
+  text-decoration: none;
+  padding-bottom:  2px;
+  border-bottom:   2px solid transparent;
+  transition:      color 0.15s, border-color 0.15s;
+}
+
+.retro-nav-link:hover {
+  color:        var(--retro-red);
+  border-color: var(--retro-red);
+}
+
+.retro-nav-link--active {
+  color:        var(--retro-red);
+  border-color: var(--retro-red);
+}
+
+.retro-dropdown-link {
+  display:         block;
+  padding:         0.6rem 1rem;
+  font-family:     var(--font-oswald), Impact, sans-serif;
+  font-weight:     600;
+  font-size:       0.85rem;
+  letter-spacing:  0.06em;
+  text-transform:  uppercase;
+  color:           var(--retro-navy);
+  text-decoration: none;
+  border-bottom:   1.5px solid rgba(0, 40, 104, 0.12);
+  transition:      background 0.12s, color 0.12s;
+}
+
+.retro-dropdown-link:last-child {
+  border-bottom: none;
+}
+
+.retro-dropdown-link:hover {
+  background: rgba(0, 40, 104, 0.07);
+  color:      var(--retro-red);
+}
+
+.retro-mobile-link {
+  display:         block;
+  padding:         0.55rem 0.75rem;
+  font-family:     var(--font-oswald), Impact, sans-serif;
+  font-weight:     600;
+  font-size:       0.95rem;
+  letter-spacing:  0.07em;
+  text-transform:  uppercase;
+  color:           var(--retro-navy);
+  text-decoration: none;
+  border-left:     3px solid transparent;
+  transition:      color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.retro-mobile-link:hover,
+.retro-mobile-link.retro-nav-link--active {
+  color:        var(--retro-red);
+  border-color: var(--retro-red);
+  background:   rgba(204, 34, 0, 0.05);
+}
+
+/* Upload drop zone drag-active state */
+.retro-upload-active {
+  background:   var(--retro-navy) !important;
+  border-color: var(--retro-gold) !important;
+}
+
+.retro-upload-active p,
+.retro-upload-active span {
+  color: var(--retro-cream) !important;
+  opacity: 1 !important;
+}
+
+/* Pulse animation for loading states */
+@keyframes retro-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.retro-pulse {
+  animation: retro-pulse 1.4s ease-in-out infinite;
 }
