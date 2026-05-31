@@ -11,6 +11,7 @@ const RESOURCES = [
   { href: "/breaking-a-lease", label: "Breaking a Lease" },
   { href: "/late-fees-lease", label: "Late Rent Fees" },
   { href: "/pet-deposit-laws", label: "Pet Deposit Laws" },
+  { href: "/blog", label: "Blog" },
 ];
 
 export default function Navbar() {
@@ -168,6 +169,7 @@ export default function Navbar() {
           <Link href="/guide" className={`retro-mobile-link${pathname === "/guide" ? " retro-nav-link--active" : ""}`}>Clause Guide</Link>
           <Link href="/about" className={`retro-mobile-link${pathname === "/about" ? " retro-nav-link--active" : ""}`}>About</Link>
           <Link href="/contact" className={`retro-mobile-link${pathname === "/contact" ? " retro-nav-link--active" : ""}`}>Contact</Link>
+          <Link href="/blog" className={`retro-mobile-link${pathname === "/blog" ? " retro-nav-link--active" : ""}`}>Blog</Link>
 
           <p style={{
             marginTop:     "0.75rem",

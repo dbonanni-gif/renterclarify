@@ -4,6 +4,7 @@ import LeaseForm from "./components/LeaseForm";
 import LeaseUpload from "./components/LeaseUpload";
 import { RetroCard } from "./components/RetroCard";
 import { HomeButtons } from "./components/HomeButtons";
+import { BLOG_POSTS_META } from "./lib/blogPostsMeta";
 
 const HOW_IT_WORKS = [
   {
@@ -275,6 +276,111 @@ export default function Home() {
               </div>
             </RetroCard>
           ))}
+        </div>
+      </section>
+
+      {/* ── Latest from the blog ── */}
+      <section id="blog" style={{
+        background: "var(--retro-cream)",
+        padding:    "clamp(2.5rem, 6vw, 4rem) 1.5rem",
+      }}>
+        <div style={{ maxWidth: "1040px", margin: "0 auto", textAlign: "center" }}>
+          <h2 style={{
+            ...sectionHeadingStyle,
+            fontSize:     "clamp(1.5rem, 3vw, 2.2rem)",
+            color:        "var(--retro-navy)",
+            marginBottom: "0.75rem",
+          }}>
+            Latest From the Blog
+          </h2>
+          <p style={{
+            fontFamily:   "Georgia, Cambria, serif",
+            color:        "var(--retro-ink)",
+            opacity:      0.7,
+            marginBottom: "2rem",
+            fontSize:     "1rem",
+          }}>
+            Read practical renter rights guidance and housing tips written in plain English.
+          </p>
+
+          <div style={{
+            display:             "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap:                 "1.5rem",
+          }}>
+            {BLOG_POSTS_META.slice(0, 1).map((post) => (
+              <article key={post.slug} style={{
+                background: "white",
+                border:     "3px solid var(--retro-navy)",
+                borderRadius: "4px",
+                padding:    "1.8rem",
+                textAlign:  "left",
+                boxShadow:  "var(--retro-shadow)",
+              }}>
+                <p style={{
+                  margin:       0,
+                  color:        "var(--retro-red)",
+                  fontFamily:   "var(--font-oswald), Impact, sans-serif",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  fontSize:      "0.8rem",
+                }}>
+                  {post.category}
+                </p>
+                <h3 style={{
+                  margin: "0.75rem 0 1rem",
+                  color: "var(--retro-navy)",
+                  fontSize: "1.5rem",
+                  lineHeight: "1.2",
+                }}>
+                  <Link href={`/blog/${post.slug}`} style={{ color: "inherit", textDecoration: "none" }}>
+                    {post.title}
+                  </Link>
+                </h3>
+                <p style={{
+                  margin: "0 0 1.25rem",
+                  color: "var(--retro-ink)",
+                  lineHeight: "1.75",
+                  fontFamily: "Georgia, serif",
+                }}>
+                  {post.excerpt}
+                </p>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+                  <span style={{ color: "var(--retro-ink)", opacity: 0.7, fontSize: "0.9rem" }}>{post.date}</span>
+                  <Link
+                    href={`/blog/${post.slug}`}
+                    style={{
+                      display:       "inline-block",
+                      background:    "var(--retro-navy)",
+                      color:         "var(--retro-cream)",
+                      padding:       "0.7rem 1.2rem",
+                      borderRadius:  "2px",
+                      textDecoration:"none",
+                      fontFamily:    "var(--font-oswald), Impact, sans-serif",
+                      fontWeight:    "700",
+                      fontSize:      "0.9rem",
+                    }}
+                  >
+                    Read the post
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div style={{ marginTop: "2rem" }}>
+            <Link
+              href="/blog"
+              style={{
+                display:       "inline-block",
+                color:         "var(--retro-navy)",
+                textDecoration:"underline",
+                fontWeight:    "700",
+              }}
+            >
+              View all blog posts
+            </Link>
+          </div>
         </div>
       </section>
 
